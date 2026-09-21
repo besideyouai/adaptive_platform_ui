@@ -23,6 +23,7 @@ class IOS26Scaffold extends StatefulWidget {
     super.key,
     this.bottomNavigationBar,
     this.title,
+    this.backgroundColor,
     this.actions,
     this.leading,
     this.tintColor,
@@ -38,6 +39,7 @@ class IOS26Scaffold extends StatefulWidget {
 
   final AdaptiveBottomNavigationBar? bottomNavigationBar;
   final String? title;
+  final Color? backgroundColor;
   final List<AdaptiveAppBarAction>? actions;
   final Widget? leading;
   final Color? tintColor;
@@ -449,6 +451,7 @@ class _IOS26ScaffoldState extends State<IOS26Scaffold>
         widget.bottomNavigationBar!.items!.isNotEmpty;
 
     return CupertinoPageScaffold(
+      backgroundColor: widget.backgroundColor,
       // When a native tab bar is present it sits in Positioned(bottom: 0)
       // inside a Stack. If the scaffold resizes for the keyboard the tab bar
       // floats above it — non-standard on iOS. Disable the resize so the

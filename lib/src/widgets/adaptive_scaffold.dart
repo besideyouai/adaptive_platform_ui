@@ -78,6 +78,8 @@ class AdaptiveScaffold extends StatefulWidget {
     this.appBar,
     this.bottomNavigationBar,
     this.body,
+    this.backgroundColor,
+    this.platform,
     this.resizeToAvoidBottomInset,
     this.floatingActionButton,
     this.minimizeBehavior = TabBarMinimizeBehavior.automatic,
@@ -104,6 +106,10 @@ class AdaptiveScaffold extends StatefulWidget {
   /// Bottom navigation bar configuration
   /// If null, no bottom navigation will be shown
   final AdaptiveBottomNavigationBar? bottomNavigationBar;
+
+  /// Optional presentation override for Flutter scaffolds only.
+  final TargetPlatform? platform;
+  final Color? backgroundColor;
 
   /// Body widget
   final Widget? body;
@@ -427,6 +433,7 @@ class _AdaptiveScaffoldState extends State<AdaptiveScaffold> {
           key: ValueKey(
             'ios26_scaffold_${widget.bottomNavigationBar?.selectedIndex ?? 0}_${widget.body?.runtimeType.toString() ?? "empty"}',
           ),
+          backgroundColor: widget.backgroundColor,
           bottomNavigationBar: widget.bottomNavigationBar,
           title: widget.appBar?.title,
           actions: widget.appBar?.actions,
@@ -446,7 +453,8 @@ class _AdaptiveScaffoldState extends State<AdaptiveScaffold> {
 
     // iOS <26 (iOS 18 and below) OR iOS 26+ with useNativeToolbar: false
     // Use CupertinoPageScaffold with CupertinoTabBar if destinations provided
-    if (PlatformInfo.isIOS) {
+    if (widget.platform == TargetPlatform.iOS ||
+        (widget.platform == null && PlatformInfo.isIOS)) {
       Widget? effectiveLeading = widget.appBar?.leading;
 
       if (widget.bottomNavigationBar?.items != null &&
@@ -648,6 +656,7 @@ class _AdaptiveScaffoldState extends State<AdaptiveScaffold> {
 
         return _wrapWithDrawerIfNeeded(
           CupertinoPageScaffold(
+            backgroundColor: widget.backgroundColor,
             resizeToAvoidBottomInset:
                 widget.resizeToAvoidBottomInset ?? !hasNativeTabBar,
             navigationBar: navigationBar,
@@ -740,7 +749,12 @@ class _AdaptiveScaffoldState extends State<AdaptiveScaffold> {
 
       // Always use CupertinoPageScaffold to ensure proper background color
       return _wrapWithDrawerIfNeeded(
-        CupertinoPageScaffold(navigationBar: navigationBar, child: body),
+        CupertinoPageScaffold(
+          backgroundColor: widget.backgroundColor,
+          resizeToAvoidBottomInset: widget.resizeToAvoidBottomInset ?? true,
+          navigationBar: navigationBar,
+          child: body,
+        ),
       );
     }
 
@@ -841,6 +855,7 @@ class _AdaptiveScaffoldState extends State<AdaptiveScaffold> {
 
       return Scaffold(
         key: widget.scaffoldKey,
+        backgroundColor: widget.backgroundColor,
         appBar: appBar,
         body: widget.body ?? const SizedBox.shrink(),
         resizeToAvoidBottomInset: widget.resizeToAvoidBottomInset,
@@ -902,6 +917,7 @@ class _AdaptiveScaffoldState extends State<AdaptiveScaffold> {
     // Always use Scaffold to ensure Material context
     return Scaffold(
       key: widget.scaffoldKey,
+      backgroundColor: widget.backgroundColor,
       appBar: appBar,
       body: widget.body ?? const SizedBox.shrink(),
       resizeToAvoidBottomInset: widget.resizeToAvoidBottomInset,
