@@ -4,6 +4,7 @@ import UIKit
 /// A UIAlertController that manages its own background dimming
 class TintAdjustingAlertController: UIAlertController {
     private var backgroundDimmingView: UIView?
+    var dimmingColor = UIColor.black.withAlphaComponent(0.3)
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
@@ -47,7 +48,7 @@ class TintAdjustingAlertController: UIAlertController {
               backgroundDimmingView == nil else { return }
 
         let dimmingView = UIView()
-        dimmingView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
+        dimmingView.backgroundColor = dimmingColor
         dimmingView.frame = presentingVC.view.bounds
         dimmingView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         dimmingView.alpha = 0
@@ -96,6 +97,7 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
         var oneTimeCode: String? = nil
         var isDark: Bool = false
         var tint: UIColor? = nil
+        var dimmingColor: UIColor? = nil
         var alertStyleParam: String = "glass"
         var textFieldPlaceholder: String? = nil
         var textFieldInitialValue: String? = nil
@@ -114,6 +116,7 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
             if let ic = dict["iconColor"] as? NSNumber { iconColor = UIColor(argb: ic.intValue) }
             if let otc = dict["oneTimeCode"] as? String { oneTimeCode = otc }
             if let v = dict["isDark"] as? NSNumber { isDark = v.boolValue }
+            if let color = dict["dimmingColor"] as? NSNumber { dimmingColor = UIColor(argb: color.intValue) }
             if let t = dict["tint"] as? NSNumber { tint = UIColor(argb: t.intValue) }
             if let alertStyleValue = dict["alertStyle"] as? String { alertStyleParam = alertStyleValue }
             if let tfp = dict["textFieldPlaceholder"] as? String { textFieldPlaceholder = tfp }
@@ -145,6 +148,8 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
             textFieldMaxLength: textFieldMaxLength,
             textFieldKeyboardType: textFieldKeyboardType
         )
+
+        if let color = dimmingColor { alertController?.dimmingColor = color }
 
         self.channel.setMethodCallHandler { [weak self] call, result in
             guard let self = self else {
@@ -527,7 +532,7 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
         // alert tint to red when no primary action is present.
         if let action = primaryAction {
             alert.preferredAction = action
-            alert.view.tintColor = UIColor.systemBlue
+            alert.view.tintColor = tint ?? UIColor.systemBlue
         }
 
         // Present the alert

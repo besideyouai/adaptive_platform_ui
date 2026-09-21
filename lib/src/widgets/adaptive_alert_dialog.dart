@@ -57,6 +57,8 @@ class AdaptiveAlertDialog {
     double? iconSize,
     Color? iconColor,
     String? oneTimeCode,
+    Color? tint,
+    Color? barrierColor,
   }) {
     // iOS 26+ - Use native iOS 26 alert dialog
     if (PlatformInfo.isIOS26OrHigher()) {
@@ -73,6 +75,8 @@ class AdaptiveAlertDialog {
         context: context,
         barrierColor: CupertinoColors.transparent,
         builder: (context) => IOS26AlertDialog(
+          tint: tint,
+          dimmingColor: barrierColor,
           title: title,
           message: message,
           actions: actions,
@@ -89,6 +93,7 @@ class AdaptiveAlertDialog {
     if (PlatformInfo.isIOS) {
       return showCupertinoDialog<void>(
         context: context,
+        barrierColor: barrierColor,
         builder: (context) {
           Widget? contentWidget;
           final hasLegacyIcon =
@@ -164,6 +169,7 @@ class AdaptiveAlertDialog {
                 : null,
             actions: actions.map((action) {
               return CupertinoDialogAction(
+                textStyle: tint == null ? null : TextStyle(color: tint),
                 onPressed: () {
                   Navigator.of(context).pop();
                   action.onPressed();
@@ -190,6 +196,7 @@ class AdaptiveAlertDialog {
       iconColor: iconColor,
       oneTimeCode: oneTimeCode,
       input: null,
+      barrierColor: barrierColor,
     );
   }
 
@@ -336,11 +343,13 @@ class AdaptiveAlertDialog {
     Color? iconColor,
     String? oneTimeCode,
     AdaptiveAlertDialogInput? input,
+    Color? barrierColor,
   }) {
     final textController = TextEditingController(text: input?.initialValue);
 
     return showDialog<T>(
       context: context,
+      barrierColor: barrierColor,
       builder: (context) {
         // Build custom content if icon, OTP, or textfield is present
         Widget? contentWidget;

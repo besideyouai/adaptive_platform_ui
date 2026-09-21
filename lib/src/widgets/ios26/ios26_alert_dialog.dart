@@ -72,7 +72,12 @@ class IOS26AlertDialog extends StatefulWidget {
     this.iconColor,
     this.oneTimeCode,
     this.input,
+    this.tint,
+    this.dimmingColor,
   });
+
+  final Color? tint;
+  final Color? dimmingColor;
 
   /// The title of the alert dialog
   final String title;
@@ -110,7 +115,8 @@ class _IOS26AlertDialogState extends State<IOS26AlertDialog> {
 
   bool get _isDark =>
       MediaQuery.platformBrightnessOf(context) == Brightness.dark;
-  Color? get _effectiveTint => CupertinoTheme.of(context).primaryColor;
+  Color? get _effectiveTint =>
+      widget.tint ?? CupertinoTheme.of(context).primaryColor;
 
   @override
   void didChangeDependencies() {
@@ -168,6 +174,8 @@ class _IOS26AlertDialogState extends State<IOS26AlertDialog> {
             ),
         },
         'alertStyle': 'glass',
+        if (widget.dimmingColor != null)
+          'dimmingColor': _colorToARGB(widget.dimmingColor!),
         'isDark': _isDark,
         if (_effectiveTint != null) 'tint': _colorToARGB(_effectiveTint!),
       };
