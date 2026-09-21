@@ -35,3 +35,29 @@ analysis pass. Xcode 26.6 compiled the patch for an iPhone 17 / iOS 26.5
 simulator. An isolated host confirmed that external route dismissal removes
 the native alert and dimming overlay, and that reopening and confirming returns
 normally. This does not establish real-device or release-build coverage.
+
+### Presentation and form contracts
+
+Standard alerts accept an explicit tint and dimming color. The native primary
+action preserves the supplied tint instead of overriding it with system blue.
+Input fields forward expanding layout, vertical alignment, placeholder/cursor
+style, autofill, suggestions, outside taps and an editable-field key. Optional
+Flutter presentation overrides aid compatibility checks without enabling native
+APIs; borderless Cupertino fields can opt out of default decoration.
+Scaffolds forward background color and keyboard resizing on each rendering path.
+
+### Selection menus
+
+Menu entries expose a selected state across Material, legacy Cupertino and
+native iOS menus. A rebuilt native menu invalidates its previous callback
+binding and checks a generation against the items snapshot, so a delayed index
+cannot select an unrelated item after a list refresh. Custom native triggers
+accept an accessibility label and enabled state, avoiding an unnamed duplicate
+button behind a custom child. Disabled custom menus cannot open.
+
+Focused tests cover editable draft/focus preservation, outside-tap behavior,
+keyboard-resize constraints and menu selection/disable semantics. iOS 26.5
+simulator checks cover the native primary tint, selected menu items, selection,
+the single named trigger, disabling, and retaining a draft across remounts.
+Native software-keyboard occlusion, full VoiceOver use, older iOS and Android
+device validation remain separate from these checks.
