@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -105,6 +106,7 @@ class _IOS26AlertDialogState extends State<IOS26AlertDialog> {
   MethodChannel? _channel;
   bool? _lastIsDark;
   int? _lastTint;
+  bool _actionHandled = false;
 
   bool get _isDark =>
       MediaQuery.platformBrightnessOf(context) == Brightness.dark;
@@ -118,7 +120,9 @@ class _IOS26AlertDialogState extends State<IOS26AlertDialog> {
 
   @override
   void dispose() {
-    _channel?.setMethodCallHandler(null);
+    final channel = _channel;
+    channel?.setMethodCallHandler(null);
+    if (channel != null) unawaited(_dismissNative(channel));
     super.dispose();
   }
 
@@ -194,10 +198,9 @@ class _IOS26AlertDialogState extends State<IOS26AlertDialog> {
       content: widget.message != null ? Text(widget.message!) : null,
       actions: widget.actions.map((action) {
         return CupertinoDialogAction(
-          onPressed: () {
-            Navigator.of(context).pop();
-            action.onPressed();
-          },
+          onPressed: action.enabled && action.style != AlertActionStyle.disabled
+              ? () => _handleAction(action)
+              : null,
           isDefaultAction: action.style == AlertActionStyle.defaultAction,
           isDestructiveAction: action.style == AlertActionStyle.destructive,
           child: Text(action.title),
@@ -208,6 +211,10 @@ class _IOS26AlertDialogState extends State<IOS26AlertDialog> {
 
   void _onCreated(int id) {
     final ch = MethodChannel('adaptive_platform_ui/ios26_alert_dialog_$id');
+    if (!mounted) {
+      unawaited(_dismissNative(ch));
+      return;
+    }
     _channel = ch;
     ch.setMethodCallHandler(_onMethodCall);
     _lastTint = _effectiveTint != null ? _colorToARGB(_effectiveTint!) : null;
@@ -223,28 +230,41 @@ class _IOS26AlertDialogState extends State<IOS26AlertDialog> {
       if (idx != null && idx >= 0 && idx < widget.actions.length) {
         final action = widget.actions[idx];
 
-        // Dismiss the dialog with appropriate value
-        if (mounted) {
-          if (widget.input != null) {
-            // Input dialog
-            if (action.style == AlertActionStyle.cancel) {
-              // Cancel button returns null for input dialogs
-              Navigator.of(context).pop<String?>(null);
-            } else {
-              // Other buttons return the text field value
-              Navigator.of(context).pop<String?>(textFieldValue);
-            }
-          } else {
-            // Normal dialog - just close without returning a value
-            Navigator.of(context).pop();
-          }
-        }
-
-        // Then call the action
-        action.onPressed();
+        _handleAction(action, textFieldValue: textFieldValue);
       }
     }
     return null;
+  }
+
+  void _handleAction(AlertAction action, {String? textFieldValue}) {
+    // A native callback can arrive while the Flutter route is leaving.
+    // Never pop whichever route happens to be on top at that point.
+    if (!mounted ||
+        _actionHandled ||
+        !action.enabled ||
+        action.style == AlertActionStyle.disabled ||
+        ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+    _actionHandled = true;
+    if (widget.input != null) {
+      Navigator.of(context).pop<String?>(
+        action.style == AlertActionStyle.cancel ? null : textFieldValue,
+      );
+    } else {
+      Navigator.of(context).pop();
+    }
+    action.onPressed();
+  }
+
+  Future<void> _dismissNative(MethodChannel channel) async {
+    try {
+      await channel.invokeMethod<void>('dismiss');
+    } on MissingPluginException {
+      // The engine may already have removed the platform view.
+    } on PlatformException {
+      // Native deinitialization also dismisses the owned alert.
+    }
   }
 
   Future<void> _syncBrightnessIfNeeded() async {

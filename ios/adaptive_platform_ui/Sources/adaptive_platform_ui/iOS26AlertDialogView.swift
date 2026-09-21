@@ -79,6 +79,7 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
     private let container: UIView
     private var alertController: TintAdjustingAlertController?
     private var alertStyle: String = "glass"
+    private var isDismissed = false
 
     init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
         self.channel = FlutterMethodChannel(name: "adaptive_platform_ui/ios26_alert_dialog_\(viewId)", binaryMessenger: messenger)
@@ -145,7 +146,25 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
             textFieldKeyboardType: textFieldKeyboardType
         )
 
-        self.channel.setMethodCallHandler(onMethodCall)
+        self.channel.setMethodCallHandler { [weak self] call, result in
+            guard let self = self else {
+                result(nil)
+                return
+            }
+            self.onMethodCall(call: call, result: result)
+        }
+    }
+
+    deinit {
+        channel.setMethodCallHandler(nil)
+        alertController?.dismiss(animated: false)
+    }
+
+    private func dismissAlert() {
+        guard !isDismissed else { return }
+        isDismissed = true
+        alertController?.dismiss(animated: false)
+        alertController = nil
     }
 
     func view() -> UIView {
@@ -451,7 +470,7 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
             }
 
             let action = UIAlertAction(title: actionTitle, style: alertActionStyle) { [weak self] _ in
-                guard let self = self, let alert = self.alertController else { return }
+                guard let self = self, !self.isDismissed, let alert = self.alertController else { return }
 
                 // Get text field value if exists
                 var textFieldValue: String? = nil
@@ -513,7 +532,7 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
 
         // Present the alert
         DispatchQueue.main.async { [weak self] in
-            if let topController = self?.topViewController() {
+            if let self = self, !self.isDismissed, let topController = self.topViewController() {
                 topController.present(alert, animated: true)
             }
         }
@@ -544,6 +563,10 @@ class iOS26AlertDialogView: NSObject, FlutterPlatformView {
 
     private func onMethodCall(call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
+        case "dismiss":
+            dismissAlert()
+            result(nil)
+
         case "setBrightness":
             if let args = call.arguments as? [String: Any],
                let isDark = args["isDark"] as? Bool {
