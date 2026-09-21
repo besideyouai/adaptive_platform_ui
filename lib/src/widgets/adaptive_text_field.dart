@@ -11,6 +11,16 @@ class AdaptiveTextField extends StatelessWidget {
   /// Creates an adaptive text field
   const AdaptiveTextField({
     super.key,
+    this.fieldKey,
+    this.platform,
+    this.placeholderStyle,
+    this.textAlignVertical,
+    this.expands = false,
+    this.cursorColor,
+    this.enableSuggestions = true,
+    this.autofillHints,
+    this.onTapOutside,
+    this.showCupertinoDecoration = true,
     this.controller,
     this.focusNode,
     this.placeholder,
@@ -39,6 +49,22 @@ class AdaptiveTextField extends StatelessWidget {
     this.decoration,
     this.cupertinoDecoration,
   });
+
+  /// Optional key for the underlying editable field.
+  final Key? fieldKey;
+
+  /// Optional presentation override. Does not enable native platform APIs.
+  final TargetPlatform? platform;
+  final TextStyle? placeholderStyle;
+  final TextAlignVertical? textAlignVertical;
+  final bool expands;
+  final Color? cursorColor;
+  final bool enableSuggestions;
+  final Iterable<String>? autofillHints;
+  final TapRegionCallback? onTapOutside;
+
+  /// Set false for a borderless field inside custom chrome.
+  final bool showCupertinoDecoration;
 
   /// Controls the text being edited.
   final TextEditingController? controller;
@@ -132,7 +158,8 @@ class AdaptiveTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (PlatformInfo.isIOS) {
+    if (platform == TargetPlatform.iOS ||
+        (platform == null && PlatformInfo.isIOS)) {
       return _buildCupertinoTextField(context);
     }
 
@@ -141,9 +168,17 @@ class AdaptiveTextField extends StatelessWidget {
 
   Widget _buildCupertinoTextField(BuildContext context) {
     return CupertinoTextField(
+      key: fieldKey,
+      textAlignVertical: textAlignVertical,
+      expands: expands,
+      cursorColor: cursorColor,
+      enableSuggestions: enableSuggestions,
+      autofillHints: autofillHints,
+      onTapOutside: onTapOutside,
       controller: controller,
       focusNode: focusNode,
       placeholder: placeholder,
+      placeholderStyle: placeholderStyle,
       keyboardType: keyboardType,
       textInputAction: textInputAction,
       textCapitalization: textCapitalization,
@@ -189,19 +224,27 @@ class AdaptiveTextField extends StatelessWidget {
       inputFormatters: inputFormatters,
       padding:
           padding ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration:
-          cupertinoDecoration ??
-          BoxDecoration(
-            color: enabled
-                ? CupertinoColors.tertiarySystemBackground
-                : CupertinoColors.quaternarySystemFill,
-            borderRadius: BorderRadius.circular(8),
-          ),
+      decoration: !showCupertinoDecoration
+          ? null
+          : cupertinoDecoration ??
+                BoxDecoration(
+                  color: enabled
+                      ? CupertinoColors.tertiarySystemBackground
+                      : CupertinoColors.quaternarySystemFill,
+                  borderRadius: BorderRadius.circular(8),
+                ),
     );
   }
 
   Widget _buildMaterialTextField(BuildContext context) {
     return TextField(
+      key: fieldKey,
+      textAlignVertical: textAlignVertical,
+      expands: expands,
+      cursorColor: cursorColor,
+      enableSuggestions: enableSuggestions,
+      autofillHints: autofillHints,
+      onTapOutside: onTapOutside,
       controller: controller,
       focusNode: focusNode,
       keyboardType: keyboardType,
@@ -225,6 +268,7 @@ class AdaptiveTextField extends StatelessWidget {
           decoration ??
           InputDecoration(
             hintText: placeholder,
+            hintStyle: placeholderStyle,
             prefixIcon: prefixIcon,
             suffixIcon: suffixIcon,
             prefix: prefix,
