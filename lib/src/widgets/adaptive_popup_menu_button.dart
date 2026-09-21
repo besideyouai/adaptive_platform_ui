@@ -40,7 +40,7 @@ class AdaptivePopupMenuButton<T> {
     }
 
     // Android - Use Material PopupMenuButton
-    if (PlatformInfo.isAndroid) {
+    if (!PlatformInfo.isIOS) {
       return _MaterialPopupMenuButton<T>(
         label: label,
         items: items,
@@ -66,6 +66,9 @@ class AdaptivePopupMenuButton<T> {
   /// Creates a popup menu button with a custom child widget
   static Widget widget<T>({
     Key? key,
+    TargetPlatform? platform,
+    bool enabled = true,
+    String? accessibilityLabel,
     required List<AdaptivePopupMenuEntry> items,
     required void Function(int index, AdaptivePopupMenuItem<T> entry)
     onSelected,
@@ -80,9 +83,19 @@ class AdaptivePopupMenuButton<T> {
       'onTap is only used with triggerOnLongPress: true (tap fires onTap, '
       'long-press opens the menu).',
     );
+    if (!enabled) {
+      return Semantics(
+        button: true,
+        enabled: false,
+        label: accessibilityLabel,
+        child: ExcludeSemantics(child: child),
+      );
+    }
     // iOS 26+ - Use gesture detector with native menu
-    if (PlatformInfo.isIOS26OrHigher()) {
+    if (platform == null && PlatformInfo.isIOS26OrHigher()) {
       return IOS26PopupMenuButton<T>.widget(
+        enabled: enabled,
+        accessibilityLabel: accessibilityLabel,
         items: items,
         onSelected: onSelected,
         tint: tint,
@@ -94,7 +107,8 @@ class AdaptivePopupMenuButton<T> {
     }
 
     // Android - Use Material PopupMenuButton with custom child
-    if (PlatformInfo.isAndroid) {
+    if (platform != TargetPlatform.iOS &&
+        (platform != null || !PlatformInfo.isIOS)) {
       return _MaterialPopupMenuButton<T>.widget(
         items: items,
         onSelected: onSelected,
@@ -106,8 +120,12 @@ class AdaptivePopupMenuButton<T> {
     // iOS <26 (iOS 18 and below) - Use GestureDetector with action sheet
     return Builder(
       builder: (context) => GestureDetector(
-        onTap: triggerOnLongPress ? onTap : () => _showMenu<T>(context, null, items, onSelected),
-        onLongPress: triggerOnLongPress ? () => _showMenu<T>(context, null, items, onSelected) : null,
+        onTap: triggerOnLongPress
+            ? onTap
+            : () => _showMenu<T>(context, null, items, onSelected),
+        onLongPress: triggerOnLongPress
+            ? () => _showMenu<T>(context, null, items, onSelected)
+            : null,
         child: child,
       ),
     );
@@ -141,7 +159,7 @@ class AdaptivePopupMenuButton<T> {
     }
 
     // Android - Use Material IconButton with PopupMenu
-    if (PlatformInfo.isAndroid) {
+    if (!PlatformInfo.isIOS) {
       return _MaterialPopupMenuButton<T>.icon(
         icon: icon,
         items: items,
@@ -169,7 +187,9 @@ class AdaptivePopupMenuButton<T> {
     final hasImage = item.imageBytes != null;
     final hasSubtitle = item.subtitle != null && item.subtitle!.isNotEmpty;
 
-    if (!hasImage && !hasSubtitle) return Text(item.label);
+    if (!hasImage && !hasSubtitle) {
+      return Text(item.selected ? '✓ ${item.label}' : item.label);
+    }
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -187,10 +207,11 @@ class AdaptivePopupMenuButton<T> {
         ],
         Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment:
-              hasImage ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+          crossAxisAlignment: hasImage
+              ? CrossAxisAlignment.start
+              : CrossAxisAlignment.center,
           children: [
-            Text(item.label),
+            Text(item.selected ? '✓ ${item.label}' : item.label),
             if (hasSubtitle)
               Text(
                 item.subtitle!,
@@ -220,8 +241,13 @@ class AdaptivePopupMenuButton<T> {
             for (var i = 0; i < items.length; i++)
               if (items[i] is AdaptivePopupMenuItem<T>)
                 CupertinoActionSheetAction(
-                  onPressed: () => Navigator.of(ctx).pop(i),
-                  isDestructiveAction: (items[i] as AdaptivePopupMenuItem<T>).isDestructive,
+                  onPressed: () {
+                    if ((items[i] as AdaptivePopupMenuItem<T>).enabled) {
+                      Navigator.of(ctx).pop(i);
+                    }
+                  },
+                  isDestructiveAction:
+                      (items[i] as AdaptivePopupMenuItem<T>).isDestructive,
                   child: _buildActionSheetContent<T>(
                     items[i] as AdaptivePopupMenuItem<T>,
                   ),
@@ -244,7 +270,7 @@ class AdaptivePopupMenuButton<T> {
 
     if (selected != null) {
       final selectedEntry = items[selected];
-      if (selectedEntry is AdaptivePopupMenuItem<T>) {
+      if (selectedEntry is AdaptivePopupMenuItem<T> && selectedEntry.enabled) {
         onSelected(selected, selectedEntry);
       }
     }
@@ -321,6 +347,7 @@ class _MaterialPopupMenuButtonState<T>
             enabled: item.enabled,
             child: Row(
               children: [
+                if (item.selected) const Icon(Icons.check, size: 20),
                 if (item.imageBytes != null) ...[
                   ClipOval(
                     child: Image.memory(
@@ -352,9 +379,7 @@ class _MaterialPopupMenuButtonState<T>
                             Text(item.label, style: labelStyle),
                             Text(
                               item.subtitle!,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
+                              style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     color: Theme.of(context)
                                         .textTheme
@@ -381,7 +406,8 @@ class _MaterialPopupMenuButtonState<T>
         itemBuilder: (context) => menuItems,
         onSelected: (index) {
           final selectedEntry = widget.items[index];
-          if (selectedEntry is AdaptivePopupMenuItem<T>) {
+          if (selectedEntry is AdaptivePopupMenuItem<T> &&
+              selectedEntry.enabled) {
             widget.onSelected(index, selectedEntry);
           }
         },
@@ -400,7 +426,8 @@ class _MaterialPopupMenuButtonState<T>
           itemBuilder: (context) => menuItems,
           onSelected: (index) {
             final selectedEntry = widget.items[index];
-            if (selectedEntry is AdaptivePopupMenuItem<T>) {
+            if (selectedEntry is AdaptivePopupMenuItem<T> &&
+                selectedEntry.enabled) {
               widget.onSelected(index, selectedEntry);
             }
           },
@@ -424,7 +451,8 @@ class _MaterialPopupMenuButtonState<T>
           itemBuilder: (context) => menuItems,
           onSelected: (index) {
             final selectedEntry = widget.items[index];
-            if (selectedEntry is AdaptivePopupMenuItem<T>) {
+            if (selectedEntry is AdaptivePopupMenuItem<T> &&
+                selectedEntry.enabled) {
               widget.onSelected(index, selectedEntry);
             }
           },

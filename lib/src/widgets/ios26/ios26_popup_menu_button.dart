@@ -24,6 +24,7 @@ class AdaptivePopupMenuItem<T> extends AdaptivePopupMenuEntry {
     this.icon,
     this.imageBytes,
     this.enabled = true,
+    this.selected = false,
     this.isDestructive = false,
     this.value,
   });
@@ -40,6 +41,9 @@ class AdaptivePopupMenuItem<T> extends AdaptivePopupMenuEntry {
   /// Optional image bytes (e.g. an avatar) displayed as the item's image,
   /// clipped to a circle. Takes precedence over [icon] when both are set.
   final Uint8List? imageBytes;
+
+  /// Whether this is the currently selected value.
+  final bool selected;
 
   /// Whether the item can be selected
   final bool enabled;
@@ -78,6 +82,8 @@ class IOS26PopupMenuButton<T> extends StatefulWidget {
     required this.items,
     required this.onSelected,
     this.tint,
+    this.enabled = true,
+    this.accessibilityLabel,
     this.height = 32.0,
     this.shrinkWrap = false,
     this.buttonStyle = PopupButtonStyle.plain,
@@ -95,6 +101,8 @@ class IOS26PopupMenuButton<T> extends StatefulWidget {
     required this.items,
     required this.onSelected,
     this.tint,
+    this.enabled = true,
+    this.accessibilityLabel,
     double size = 44.0,
     this.buttonStyle = PopupButtonStyle.glass,
   }) : buttonLabel = null,
@@ -112,6 +120,8 @@ class IOS26PopupMenuButton<T> extends StatefulWidget {
     required this.items,
     required this.onSelected,
     this.tint,
+    this.enabled = true,
+    this.accessibilityLabel,
     this.buttonStyle = PopupButtonStyle.plain,
     this.triggerOnLongPress = false,
     this.onTap,
@@ -127,6 +137,9 @@ class IOS26PopupMenuButton<T> extends StatefulWidget {
          'onTap is only used with triggerOnLongPress: true (tap fires onTap, '
          'long-press opens the menu).',
        );
+
+  final bool enabled;
+  final String? accessibilityLabel;
 
   /// Text for the button (null when using icon)
   final String? buttonLabel;
@@ -183,6 +196,7 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
   bool? _lastIsDark;
   int? _lastTint;
   double? _intrinsicWidth;
+  int _menuGeneration = 0;
 
   bool get _isDark =>
       MediaQuery.platformBrightnessOf(context) == Brightness.dark;
@@ -202,8 +216,12 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
     _syncBrightnessIfNeeded();
 
     // Check if menu items have changed
-    if (_hasMenuItemsChanged(oldWidget.items, widget.items)) {
-      _updateMenuItems();
+    if (_hasMenuItemsChanged(oldWidget.items, widget.items) ||
+        oldWidget.enabled != widget.enabled ||
+        oldWidget.accessibilityLabel != widget.accessibilityLabel) {
+      _menuGeneration++;
+      _channel?.setMethodCallHandler(null);
+      _channel = null;
     }
 
     // Check if button label or icon has changed
@@ -244,6 +262,7 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
             oldItem.icon != newItem.icon ||
             oldItem.imageBytes != newItem.imageBytes ||
             oldItem.enabled != newItem.enabled ||
+            oldItem.selected != newItem.selected ||
             oldItem.isDestructive != newItem.isDestructive ||
             oldItem.value != newItem.value) {
           return true;
@@ -251,52 +270,6 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
       }
     }
     return false;
-  }
-
-  Future<void> _updateMenuItems() async {
-    final ch = _channel;
-    if (ch == null) return;
-
-    // Flatten entries into parallel arrays for the platform view
-    final labels = <String>[];
-    final subtitles = <String>[];
-    final symbols = <String>[];
-    final imageData = <Uint8List?>[];
-    final isDivider = <bool>[];
-    final enabled = <bool>[];
-    final isDestructive = <bool>[];
-
-    for (final e in widget.items) {
-      if (e is AdaptivePopupMenuDivider) {
-        labels.add('');
-        subtitles.add('');
-        symbols.add('');
-        imageData.add(null);
-        isDivider.add(true);
-        enabled.add(false);
-        isDestructive.add(false);
-      } else if (e is AdaptivePopupMenuItem<T>) {
-        labels.add(e.label);
-        subtitles.add(e.subtitle ?? '');
-        symbols.add(e.icon is String ? e.icon as String : '');
-        imageData.add(e.imageBytes);
-        isDivider.add(false);
-        enabled.add(e.enabled);
-        isDestructive.add(e.isDestructive);
-      }
-    }
-
-    try {
-      await ch.invokeMethod('updateMenuItems', {
-        'labels': labels,
-        'subtitles': subtitles,
-        'sfSymbols': symbols,
-        'imageData': imageData,
-        'isDivider': isDivider,
-        'enabled': enabled,
-        'isDestructive': isDestructive,
-      });
-    } catch (_) {}
   }
 
   @override
@@ -325,6 +298,7 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
       final imageData = <Uint8List?>[];
       final isDivider = <bool>[];
       final enabled = <bool>[];
+      final selected = <bool>[];
       final isDestructiveList = <bool>[];
 
       for (final e in widget.items) {
@@ -335,6 +309,7 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
           imageData.add(null);
           isDivider.add(true);
           enabled.add(false);
+          selected.add(false);
           isDestructiveList.add(false);
         } else if (e is AdaptivePopupMenuItem<T>) {
           labels.add(e.label);
@@ -343,6 +318,7 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
           imageData.add(e.imageBytes);
           isDivider.add(false);
           enabled.add(e.enabled);
+          selected.add(e.selected);
           isDestructiveList.add(e.isDestructive);
         }
       }
@@ -354,12 +330,16 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
         if (isCustomWidget) 'customWidget': true, // Hide native button content
         if (widget.triggerOnLongPress) 'triggerOnLongPress': true,
         'buttonStyle': widget.buttonStyle.name,
+        'buttonEnabled': widget.enabled,
+        if (widget.accessibilityLabel != null)
+          'accessibilityLabel': widget.accessibilityLabel,
         'labels': labels,
         'subtitles': subtitles,
         'sfSymbols': symbols,
         'imageData': imageData,
         'isDivider': isDivider,
         'enabled': enabled,
+        'selected': selected,
         'isDestructive': isDestructiveList,
         'isDark': _isDark,
         if (_effectiveTint != null) 'tint': _colorToARGB(_effectiveTint!),
@@ -369,25 +349,29 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
       final itemsKey = widget.items
           .map((item) {
             if (item is AdaptivePopupMenuItem<T>) {
-              return '${item.label}_${item.subtitle}_${item.icon}_${item.enabled}_${item.value}_${item.imageBytes?.length}';
+              return '${item.label}_${item.subtitle}_${item.icon}_${item.enabled}_${item.selected}_${item.value}_${item.imageBytes?.length}';
             }
             return 'divider';
           })
           .join('_');
 
       final viewKey = ValueKey(
-        '${widget.buttonLabel}_${widget.buttonIcon}_${widget.child?.runtimeType}_$itemsKey',
+        '${_menuGeneration}_${widget.buttonLabel}_${widget.buttonIcon}_${widget.child?.runtimeType}_$itemsKey',
       );
 
+      final generation = _menuGeneration;
+      final items = List<AdaptivePopupMenuEntry>.of(widget.items);
       final platformView = UiKitView(
         key: viewKey,
         viewType: 'adaptive_platform_ui/ios26_popup_menu_button',
         creationParams: creationParams,
         creationParamsCodec: const StandardMessageCodec(),
-        onPlatformViewCreated: _onCreated,
+        onPlatformViewCreated: (id) => _onCreated(id, generation, items),
         gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
           widget.triggerOnLongPress
-              ? Factory<LongPressGestureRecognizer>(() => LongPressGestureRecognizer())
+              ? Factory<LongPressGestureRecognizer>(
+                  () => LongPressGestureRecognizer(),
+                )
               : Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
         },
       );
@@ -397,7 +381,10 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
         return Stack(
           fit: StackFit.passthrough,
           children: [
-            widget.child!, // Determines size and is visible
+            if (widget.accessibilityLabel != null)
+              ExcludeSemantics(child: widget.child!)
+            else
+              widget.child!, // Determines size and is visible
             Positioned.fill(
               child: platformView, // Native button overlay catches long-press
             ),
@@ -473,12 +460,14 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
     );
   }
 
-  void _onCreated(int id) {
+  void _onCreated(int id, int generation, List<AdaptivePopupMenuEntry> items) {
+    if (!mounted || generation != _menuGeneration) return;
+    _channel?.setMethodCallHandler(null);
     final ch = MethodChannel(
       'adaptive_platform_ui/ios26_popup_menu_button_$id',
     );
     _channel = ch;
-    ch.setMethodCallHandler(_onMethodCall);
+    ch.setMethodCallHandler((call) => _onMethodCall(call, generation, items));
     _lastTint = _effectiveTint != null ? _colorToARGB(_effectiveTint!) : null;
     _lastIsDark = _isDark;
     if (!widget.isIconButton) {
@@ -486,7 +475,14 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
     }
   }
 
-  Future<dynamic> _onMethodCall(MethodCall call) async {
+  Future<dynamic> _onMethodCall(
+    MethodCall call,
+    int generation,
+    List<AdaptivePopupMenuEntry> items,
+  ) async {
+    if (!mounted || !widget.enabled || generation != _menuGeneration) {
+      return null;
+    }
     if (call.method == 'itemSelected') {
       final args = call.arguments as Map?;
       final idx = (args?['index'] as num?)?.toInt();
@@ -496,17 +492,18 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
         final selectableItems = <AdaptivePopupMenuEntry>[];
         final originalIndices = <int>[];
 
-        for (int i = 0; i < widget.items.length; i++) {
-          if (widget.items[i] is AdaptivePopupMenuItem<T>) {
-            selectableItems.add(widget.items[i]);
+        for (int i = 0; i < items.length; i++) {
+          if (items[i] is AdaptivePopupMenuItem<T>) {
+            selectableItems.add(items[i]);
             originalIndices.add(i);
           }
         }
 
         if (idx >= 0 && idx < selectableItems.length) {
           final originalIndex = originalIndices[idx];
-          final selectedEntry = widget.items[originalIndex];
-          if (selectedEntry is AdaptivePopupMenuItem<T>) {
+          final selectedEntry = items[originalIndex];
+          if (selectedEntry is AdaptivePopupMenuItem<T> &&
+              selectedEntry.enabled) {
             widget.onSelected(originalIndex, selectedEntry);
           }
         }
@@ -603,7 +600,9 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
               if (widget.items[i] is AdaptivePopupMenuItem<T>)
                 CupertinoActionSheetAction(
                   onPressed: () => Navigator.of(ctx).pop(i),
-                  isDestructiveAction: (widget.items[i] as AdaptivePopupMenuItem<T>).isDestructive,
+                  isDestructiveAction:
+                      (widget.items[i] as AdaptivePopupMenuItem<T>)
+                          .isDestructive,
                   child: _buildActionSheetItemContent(
                     widget.items[i] as AdaptivePopupMenuItem<T>,
                   ),
@@ -622,7 +621,7 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
 
     if (selected != null) {
       final selectedEntry = widget.items[selected];
-      if (selectedEntry is AdaptivePopupMenuItem<T>) {
+      if (selectedEntry is AdaptivePopupMenuItem<T> && selectedEntry.enabled) {
         widget.onSelected(selected, selectedEntry);
       }
     }
